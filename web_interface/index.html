@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>패션 추천 벡터 검색</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .search-section {
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 300px;
+            padding: 15px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .search-btn {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .filters {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            background: white;
+        }
+
+        .results-section {
+            padding: 40px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .results-count {
+            font-size: 1.2em;
+            color: #495057;
+        }
+
+        .search-time {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(45deg, #f0f0f0, #e0e0e0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .product-info {
+            padding: 20px;
+        }
+
+        .product-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .product-scores {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .score-item {
+            text-align: center;
+        }
+
+        .score-label {
+            font-size: 0.8em;
+            color: #6c757d;
+            margin-bottom: 5px;
+        }
+
+        .score-value {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .product-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .rating {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stars {
+            color: #ffc107;
+        }
+
+        .review-count {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .style-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .style-tag {
+            background: #e9ecef;
+            color: #495057;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+        }
+
+        .product-link {
+            display: inline-block;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            transition: transform 0.2s;
+        }
+
+        .product-link:hover {
+            transform: translateY(-1px);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .trending-section {
+            padding: 40px;
+            background: #f8f9fa;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .recommendations {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .recommendation-tag {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .recommendation-tag:hover {
+            background: #bbdefb;
+        }
+
+        @media (max-width: 768px) {
+            .search-form {
+                flex-direction: column;
+            }
+            
+            .search-input {
+                min-width: auto;
+            }
+            
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 패션 추천 벡터 검색</h1>
+            <p>AI 기반 스마트 패션 상품 검색 시스템</p>
+        </div>
+
+        <div class="search-section">
+            <form class="search-form" id="searchForm">
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="searchInput" 
+                    placeholder="예: 꾸안꾸 느낌 나는 반팔, 스트릿한 무드의 티셔츠..."
+                    required
+                >
+                <button type="submit" class="search-btn">🔍 검색</button>
+            </form>
+
+            <div class="filters">
+                <div class="filter-group">
+                    <label class="filter-label">카테고리:</label>
+                    <select class="filter-select" id="categoryFilter">
+                        <option value="">전체</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">최소 평점:</label>
+                    <select class="filter-select" id="ratingFilter">
+                        <option value="">전체</option>
+                        <option value="4.5">4.5 이상</option>
+                        <option value="4.0">4.0 이상</option>
+                        <option value="3.5">3.5 이상</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">결과 수:</label>
+                    <select class="filter-select" id="resultCount">
+                        <option value="5">5개</option>
+                        <option value="10" selected>10개</option>
+                        <option value="20">20개</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="recommendations" class="recommendations"></div>
+        </div>
+
+        <div class="results-section">
+            <div class="results-header">
+                <div class="results-count" id="resultsCount">검색 결과가 여기에 표시됩니다</div>
+                <div class="search-time" id="searchTime"></div>
+            </div>
+            
+            <div id="errorMessage"></div>
+            <div id="loadingMessage" class="loading" style="display: none;">검색 중...</div>
+            <div id="productsGrid" class="products-grid"></div>
+        </div>
+
+        <div class="trending-section">
+            <h2 class="section-title">🔥 트렌딩 상품</h2>
+            <div id="trendingGrid" class="products-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8002';
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCategories();
+            loadTrendingProducts();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // 검색 폼 이벤트
+            document.getElementById('searchForm').addEventListener('submit', handleSearch);
+            
+            // 필터 변경 이벤트
+            document.getElementById('categoryFilter').addEventListener('change', handleSearch);
+            document.getElementById('ratingFilter').addEventListener('change', handleSearch);
+            document.getElementById('resultCount').addEventListener('change', handleSearch);
+        }
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/categories`);
+                const data = await response.json();
+                
+                const categorySelect = document.getElementById('categoryFilter');
+                data.categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    categorySelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('카테고리 로드 실패:', error);
+            }
+        }
+
+        async function loadTrendingProducts() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/trending`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        top_k: 6,
+                        category: null
+                    })
+                });
+                
+                const data = await response.json();
+                displayProducts(data.trending_products, 'trendingGrid');
+            } catch (error) {
+                console.error('트렌딩 상품 로드 실패:', error);
+            }
+        }
+
+        async function handleSearch(event) {
+            event.preventDefault();
+            
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return;
+
+            const category = document.getElementById('categoryFilter').value;
+            const minRating = document.getElementById('ratingFilter').value;
+            const topK = parseInt(document.getElementById('resultCount').value);
+
+            await performSearch(query, category, minRating, topK);
+        }
+
+        async function performSearch(query, category, minRating, topK) {
+            const loadingMessage = document.getElementById('loadingMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            const productsGrid = document.getElementById('productsGrid');
+            
+            loadingMessage.style.display = 'block';
+            errorMessage.style.display = 'none';
+            productsGrid.innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        top_k: topK,
+                        use_hybrid: true,
+                        category: category || null,
+                        min_rating: minRating ? parseFloat(minRating) : null
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displaySearchResults(data);
+                    loadRecommendations(query);
+                } else {
+                    throw new Error(data.detail || '검색 중 오류가 발생했습니다.');
+                }
+            } catch (error) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = `오류: ${error.message}`;
+            } finally {
+                loadingMessage.style.display = 'none';
+            }
+        }
+
+        function displaySearchResults(data) {
+            const resultsCount = document.getElementById('resultsCount');
+            const searchTime = document.getElementById('searchTime');
+            const productsGrid = document.getElementById('productsGrid');
+
+            resultsCount.textContent = `검색 결과: ${data.total_results}개`;
+            searchTime.textContent = `검색 시간: ${(data.search_time * 1000).toFixed(1)}ms`;
+
+            displayProducts(data.results, 'productsGrid');
+        }
+
+        function displayProducts(products, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            products.forEach(product => {
+                const productCard = createProductCard(product);
+                container.appendChild(productCard);
+            });
+        }
+
+        function createProductCard(product) {
+            const card = document.createElement('div');
+            card.className = 'product-card';
+
+            const stars = '★'.repeat(Math.floor(product.rating)) + '☆'.repeat(5 - Math.floor(product.rating));
+
+            card.innerHTML = `
+                <div class="product-image">
+                    이미지 없음
+                </div>
+                <div class="product-info">
+                    <div class="product-name">${product.product_name}</div>
+                    
+                    <div class="product-scores">
+                        <div class="score-item">
+                            <div class="score-label">유사도</div>
+                            <div class="score-value">${(product.similarity_score * 100).toFixed(1)}%</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">평점</div>
+                            <div class="score-value">${product.rating.toFixed(1)}</div>
+                        </div>
+                        <div class="score-item">
+                            <div class="score-label">최종점수</div>
+                            <div class="score-value">${(product.final_score * 100).toFixed(1)}%</div>
+                        </div>
+                    </div>
+
+                    <div class="product-meta">
+                        <div class="rating">
+                            <span class="stars">${stars}</span>
+                            <span class="review-count">(${product.review_count})</span>
+                        </div>
+                        <div class="category">${product.category}</div>
+                    </div>
+
+                    ${product.style_keywords && product.style_keywords.length > 0 ? `
+                        <div class="style-tags">
+                            ${product.style_keywords.map(tag => `<span class="style-tag">${tag}</span>`).join('')}
+                        </div>
+                    ` : ''}
+
+                    ${product.url ? `<a href="${product.url}" target="_blank" class="product-link">상품 보기</a>` : ''}
+                </div>
+            `;
+
+            return card;
+        }
+
+        async function loadRecommendations(query) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/recommendations`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_query: query,
+                        top_k: 5
+                    })
+                });
+
+                const data = await response.json();
+                displayRecommendations(data.recommendations);
+            } catch (error) {
+                console.error('검색어 추천 로드 실패:', error);
+            }
+        }
+
+        function displayRecommendations(recommendations) {
+            const container = document.getElementById('recommendations');
+            container.innerHTML = '';
+
+            if (recommendations.length > 0) {
+                container.innerHTML = '<strong>추천 검색어:</strong>';
+                recommendations.forEach(rec => {
+                    const tag = document.createElement('span');
+                    tag.className = 'recommendation-tag';
+                    tag.textContent = rec;
+                    tag.addEventListener('click', () => {
+                        document.getElementById('searchInput').value = rec;
+                        handleSearch(new Event('submit'));
+                    });
+                    container.appendChild(tag);
+                });
+            }
+        }
+    </script>
+</body>
+</html> 

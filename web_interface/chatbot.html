@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>패션 추천 챗봇</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chatbot-container {
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chatbot-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .chatbot-header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+
+        .chatbot-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .status-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.assistant {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 20px;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .message.assistant .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 5px;
+        }
+
+        .message-time {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+
+        .recommendations {
+            margin-top: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 150px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .product-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .product-category {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .product-rating {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+
+        .rating-stars {
+            color: #ffd700;
+        }
+
+        .product-reason {
+            font-size: 12px;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .representative-review {
+            font-size: 11px;
+            color: #666;
+            font-style: italic;
+            border-left: 3px solid #667eea;
+            padding-left: 10px;
+            margin-top: 10px;
+        }
+
+        .chat-input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .chat-input-form {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .chat-input:focus {
+            border-color: #667eea;
+        }
+
+        .send-button {
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+
+        .send-button:hover {
+            transform: scale(1.05);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 15px 20px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 20px;
+            border-bottom-left-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 5px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #667eea;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        .session-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .reset-button {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .reset-button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        @media (max-width: 768px) {
+            .chatbot-container {
+                width: 95%;
+                height: 95vh;
+            }
+            
+            .recommendations {
+                grid-template-columns: 1fr;
+            }
+            
+            .message-content {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chatbot-container">
+        <div class="chatbot-header">
+            <div class="status-indicator"></div>
+            <div class="session-info" id="sessionInfo">세션: 로딩중...</div>
+            <button class="reset-button" onclick="resetSession()">대화 초기화</button>
+            <h1>👗 패션 추천 챗봇</h1>
+            <p>원하는 스타일을 말씀해주세요! 맞춤형 패션을 추천해드립니다.</p>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                <div class="message-content">
+                    안녕하세요! 👋 패션 추천 챗봇입니다.<br><br>
+                    원하는 스타일이나 상품을 자유롭게 말씀해주세요. 예를 들어:<br>
+                    • "블랙 티셔츠 추천해줘"<br>
+                    • "편안한 착용감의 상의 찾아줘"<br>
+                    • "가성비 좋은 반팔 추천"<br>
+                    • "스트릿한 느낌의 옷 추천해줘"<br>
+                    • "꾸안꾸 무드의 상의 찾아줘"
+                </div>
+            </div>
+        </div>
+
+        <div class="typing-indicator" id="typingIndicator">
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+        </div>
+
+        <div class="chat-input-container">
+            <form class="chat-input-form" id="chatForm">
+                <input type="text" class="chat-input" id="chatInput" placeholder="메시지를 입력하세요..." autocomplete="off">
+                <button type="submit" class="send-button" id="sendButton">전송</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8002';
+        let sessionId = null;
+        let isTyping = false;
+
+        // 페이지 로드 시 세션 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSession();
+        });
+
+        async function initializeSession() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                if (response.ok) {
+                    console.log('API 서버 연결 성공');
+                } else {
+                    throw new Error('API 서버 연결 실패');
+                }
+            } catch (error) {
+                console.error('API 서버 연결 오류:', error);
+                addMessage('assistant', '죄송합니다. 서버에 연결할 수 없습니다. API 서버가 실행 중인지 확인해주세요.');
+                return;
+            }
+
+            // 세션 ID 생성
+            sessionId = generateSessionId();
+            document.getElementById('sessionInfo').textContent = `세션: ${sessionId.substring(0, 8)}...`;
+        }
+
+        function generateSessionId() {
+            return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // 채팅 폼 제출 처리
+        document.getElementById('chatForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message || isTyping) return;
+            
+            // 사용자 메시지 추가
+            addMessage('user', message);
+            input.value = '';
+            
+            // 타이핑 표시
+            showTyping();
+            
+            try {
+                // API 호출
+                const response = await fetch(`${API_BASE_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: sessionId
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // 타이핑 숨기기
+                hideTyping();
+                
+                // 봇 응답 추가
+                addMessage('assistant', data.response, data.recommendations);
+                
+            } catch (error) {
+                console.error('채팅 오류:', error);
+                hideTyping();
+                addMessage('assistant', '죄송합니다. 오류가 발생했습니다. 다시 시도해주세요.');
+            }
+        });
+
+        function addMessage(role, content, recommendations = null) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const time = new Date().toLocaleTimeString('ko-KR', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            let messageHTML = `
+                <div class="message-content">
+                    ${content}
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+            
+            // 추천 상품이 있는 경우 추가
+            if (recommendations && recommendations.length > 0) {
+                messageHTML += `
+                    <div class="recommendations">
+                        ${recommendations.map(product => `
+                            <div class="product-card" onclick="openProduct('${product.url}')">
+                                <div class="product-image">
+                                    ${product.image_url ? `<img src="${product.image_url}" alt="${product.product_name}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 10px;">` : '이미지 없음'}
+                                </div>
+                                <div class="product-name">${product.product_name}</div>
+                                <div class="product-category">${product.category}</div>
+                                <div class="product-rating">
+                                    <span class="rating-stars">${'★'.repeat(Math.floor(product.rating))}${'☆'.repeat(5 - Math.floor(product.rating))}</span>
+                                    <span>${product.rating} (${product.review_count}개 리뷰)</span>
+                                </div>
+                                <div class="product-reason">${product.recommendation_reason}</div>
+                                ${product.representative_review ? `<div class="representative-review">"${product.representative_review}"</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            messageDiv.innerHTML = messageHTML;
+            messagesContainer.appendChild(messageDiv);
+            
+            // 스크롤을 맨 아래로
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTyping() {
+            isTyping = true;
+            document.getElementById('typingIndicator').style.display = 'block';
+            document.getElementById('sendButton').disabled = true;
+            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+        }
+
+        function hideTyping() {
+            isTyping = false;
+            document.getElementById('typingIndicator').style.display = 'none';
+            document.getElementById('sendButton').disabled = false;
+        }
+
+        function openProduct(url) {
+            if (url) {
+                window.open(url, '_blank');
+            }
+        }
+
+        async function resetSession() {
+            if (confirm('대화를 초기화하시겠습니까?')) {
+                try {
+                    if (sessionId) {
+                        await fetch(`${API_BASE_URL}/reset/${sessionId}`, { method: 'POST' });
+                    }
+                    
+                    // 새로운 세션 생성
+                    sessionId = generateSessionId();
+                    document.getElementById('sessionInfo').textContent = `세션: ${sessionId.substring(0, 8)}...`;
+                    
+                    // 채팅 메시지 초기화
+                    document.getElementById('chatMessages').innerHTML = `
+                        <div class="message assistant">
+                            <div class="message-content">
+                                안녕하세요! 👋 패션 추천 챗봇입니다.<br><br>
+                                원하는 스타일이나 상품을 자유롭게 말씀해주세요. 예를 들어:<br>
+                                • "블랙 티셔츠 추천해줘"<br>
+                                • "편안한 착용감의 상의 찾아줘"<br>
+                                • "가성비 좋은 반팔 추천"<br>
+                                • "스트릿한 느낌의 옷 추천해줘"<br>
+                                • "꾸안꾸 무드의 상의 찾아줘"
+                            </div>
+                        </div>
+                    `;
+                } catch (error) {
+                    console.error('세션 리셋 오류:', error);
+                    alert('세션 리셋 중 오류가 발생했습니다.');
+                }
+            }
+        }
+
+        // Enter 키로 전송
+        document.getElementById('chatInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+            }
+        });
+    </script>
+</body>
+</html> 

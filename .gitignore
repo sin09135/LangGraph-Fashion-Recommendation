@@ -286,4 +286,8 @@ scraped_data/
 
 # Recommendation system outputs
 recommendation_outputs/
-user_preferences.json 
+user_preferences.json
+
+# Documentation files (except README.md)
+*.md
+!README.md 

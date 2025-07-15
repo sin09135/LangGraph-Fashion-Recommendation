@@ -40,6 +40,7 @@ from agents.recommendation_agent import RecommendationAgent, ProductRecommendati
 try:
     from utils.review_analyzer import ReviewAnalyzer
     REVIEW_FEATURES_AVAILABLE = True
+
 except ImportError:
     REVIEW_FEATURES_AVAILABLE = False
     print("리뷰 기능을 사용할 수 없습니다.")
@@ -52,85 +53,169 @@ except ImportError:
     LANGGRAPH_AVAILABLE = False
     print("LangGraph 시스템을 사용할 수 없습니다. requirements.txt에서 langgraph 패키지를 설치하세요.")
 
+# PostgreSQL 시스템 import (선택적)
+try:
+    from agents.postgresql_recommendation_agent import PostgreSQLRecommendationAgent
+    from database.postgresql_manager import PostgreSQLManager
+    POSTGRESQL_AVAILABLE = True
+except ImportError:
+    POSTGRESQL_AVAILABLE = False
+    print("PostgreSQL 시스템을 사용할 수 없습니다. psycopg2 패키지를 설치하세요.")
+
 
 class LLMFashionRecommendationSystem:
     """LLM 기반 패션 추천 시스템"""
     
-    def __init__(self, data_dir: str = "/Users/kimsinwoo/Desktop/LLM/data", 
-                 api_key: Optional[str] = None, 
-                 use_langgraph: bool = False):
+    def __init__(self, data_dir: str = "data", use_langgraph: bool = False, use_rdb: bool = False, use_postgresql: bool = False):
         self.data_dir = data_dir
-        self.api_key = api_key
-        self.use_langgraph = use_langgraph and LANGGRAPH_AVAILABLE
+        self.use_langgraph = use_langgraph
+        self.use_rdb = use_rdb
+        self.use_postgresql = use_postgresql
         
-        # 컴포넌트 초기화
+        # 데이터 프로세서 초기화
         self.data_processor = MusinsaDataProcessor(data_dir)
-        self.query_refiner = QueryRefiner()
-        self.conversation_agent = ConversationAgent(api_key)
-        self.recommendation_agent = None
+        
+        # 리뷰 데이터 로드
+        self.reviews_data = self.data_processor.load_reviews_data()
+        
+        # LangGraph 시스템 초기화
         self.langgraph_system = None
+        if use_langgraph:
+            self._init_langgraph_system()
         
-        # 리뷰 관련 초기화
-        self.reviews_data = {}
-        self.review_analyzer = None
-        if REVIEW_FEATURES_AVAILABLE:
-            self.review_analyzer = ReviewAnalyzer()
-            self._load_sample_reviews_data()
+        # RDB 시스템 초기화
+        self.rdb_agent = None
+        if use_rdb:
+            self._init_rdb_system()
         
-        # 데이터 로드
-        self.products_df = None
-        self._load_and_process_data()
+        # PostgreSQL 시스템 초기화
+        self.postgresql_agent = None
+        if use_postgresql:
+            self._init_postgresql_system()
         
-        # LangGraph 시스템 초기화 (선택적)
-        if self.use_langgraph and self.products_df is not None:
+        # 기존 시스템 초기화 (RDB나 PostgreSQL을 사용하지 않는 경우)
+        if not use_rdb and not use_postgresql:
+            self._load_and_process_data()
+        
+        # 대화 에이전트 초기화
+        self.conversation_agent = ConversationAgent()
+        
+        # 쿼리 정제기 초기화
+        self.query_refiner = QueryRefiner()
+
+    def _init_langgraph_system(self):
+        """LangGraph 시스템 초기화"""
+        try:
+            from langgraph_fashion_system import LangGraphFashionSystem
+            
+            print("🚀 LangGraph 시스템 초기화 중...")
+            
+            # 데이터 로드 및 전처리
+            data = self.data_processor.load_data()
+            
+            if 'products' in data:
+                processed_df = self.data_processor.preprocess_products(data['products'])
+                processed_df = self.data_processor.extract_style_keywords(processed_df)
+                self.products_df = self.data_processor.create_product_embeddings_data(processed_df)
+                print(f"CSV 데이터 로드 완료: {len(self.products_df)}개 상품")
+            elif 'successful' in data:
+                processed_df = self.data_processor.preprocess_products(data['successful'])
+                processed_df = self.data_processor.extract_style_keywords(processed_df)
+                self.products_df = self.data_processor.create_product_embeddings_data(processed_df)
+                print(f"JSON 데이터 로드 완료: {len(self.products_df)}개 상품")
+            
+            # LangGraph 시스템 초기화
             self.langgraph_system = LangGraphFashionSystem(
                 self.products_df, 
-                api_key,
+                self.data_processor.api_key, # 실제 API 키 사용
                 reviews_data=self.reviews_data
             )
-            print("LangGraph 기반 워크플로우 시스템이 활성화되었습니다.")
-        else:
-            print("기존 순차 처리 시스템을 사용합니다.")
-    
-    def _load_sample_reviews_data(self):
-        """실제 리뷰 데이터 로드"""
-        if not REVIEW_FEATURES_AVAILABLE:
-            return
-        
-        try:
-            import json
-            # merged_all_data.json에서 실제 리뷰 데이터 로드
-            with open(os.path.join(self.data_dir, 'merged_all_data.json'), 'r', encoding='utf-8') as f:
-                products_data = json.load(f)
-            
-            self.reviews_data = {}
-            for product in products_data:
-                if 'review_info' in product and 'reviews' in product['review_info']:
-                    # URL에서 product_id 추출
-                    product_id = product['url'].split('/')[-1]
-                    reviews = product['review_info']['reviews']
-                    
-                    # 리뷰 데이터 정리
-                    formatted_reviews = []
-                    for review in reviews:
-                        if isinstance(review, dict) and 'content' in review:
-                            formatted_reviews.append({
-                                "content": review['content'],
-                                "rating": review.get('rating', 5),  # 기본값 5
-                                "helpful_count": review.get('helpful_count', 0),
-                                "date": review.get('date', '2024-01-01')
-                            })
-                    
-                    if formatted_reviews:
-                        self.reviews_data[product_id] = formatted_reviews
-            
-            print(f"실제 리뷰 데이터 로드 완료: {len(self.reviews_data)}개 상품")
+            print("✅ LangGraph 시스템 초기화 완료")
             
         except Exception as e:
-            print(f"리뷰 데이터 로드 실패: {e}")
-            # 실패 시 빈 딕셔너리로 초기화
-            self.reviews_data = {}
-    
+            print(f"❌ LangGraph 시스템 초기화 실패: {e}")
+            self.use_langgraph = False
+
+    def _init_rdb_system(self):
+        """RDB 시스템 초기화"""
+        try:
+            from agents.rdb_recommendation_agent import RDBRecommendationAgent
+            from database.rdb_manager import RDBManager
+            
+            print("🗄️ RDB 시스템 초기화 중...")
+            
+            # RDB 매니저 초기화
+            rdb_manager = RDBManager()
+            
+            # 데이터 로드 및 RDB에 삽입
+            data = self.data_processor.load_data()
+            
+            if 'products' in data:
+                processed_df = self.data_processor.preprocess_products(data['products'])
+                processed_df = self.data_processor.extract_style_keywords(processed_df)
+                rdb_manager.insert_products_from_dataframe(processed_df)
+                print(f"RDB에 {len(processed_df)}개 상품 데이터 삽입 완료")
+            elif 'successful' in data:
+                processed_df = self.data_processor.preprocess_products(data['successful'])
+                processed_df = self.data_processor.extract_style_keywords(processed_df)
+                rdb_manager.insert_products_from_dataframe(processed_df)
+                print(f"RDB에 {len(processed_df)}개 상품 데이터 삽입 완료")
+            
+            # RDB 추천 에이전트 초기화
+            self.rdb_agent = RDBRecommendationAgent()
+            
+            print("✅ RDB 시스템 초기화 완료")
+            
+        except Exception as e:
+            print(f"❌ RDB 시스템 초기화 실패: {e}")
+            self.use_rdb = False
+
+    def _init_postgresql_system(self):
+        """PostgreSQL 시스템 초기화"""
+        try:
+            from agents.postgresql_recommendation_agent import PostgreSQLRecommendationAgent
+            from database.postgresql_manager import PostgreSQLManager
+            
+            print("🐘 PostgreSQL 시스템 초기화 중...")
+            
+            # PostgreSQL 매니저 초기화
+            pg_manager = PostgreSQLManager(
+                host="localhost",
+                port=5432,
+                database="fashion_recommendation",
+                user="postgres",
+                password="password"
+            )
+            
+            # 데이터 로드 및 PostgreSQL에 삽입
+            data = self.data_processor.load_data()
+            
+            if 'products' in data:
+                processed_df = self.data_processor.preprocess_products(data['products'])
+                processed_df = self.data_processor.extract_style_keywords(processed_df)
+                pg_manager.insert_products_from_dataframe(processed_df)
+                print(f"PostgreSQL에 {len(processed_df)}개 상품 데이터 삽입 완료")
+            elif 'successful' in data:
+                processed_df = self.data_processor.preprocess_products(data['successful'])
+                processed_df = self.data_processor.extract_style_keywords(processed_df)
+                pg_manager.insert_products_from_dataframe(processed_df)
+                print(f"PostgreSQL에 {len(processed_df)}개 상품 데이터 삽입 완료")
+            
+            # PostgreSQL 추천 에이전트 초기화
+            self.postgresql_agent = PostgreSQLRecommendationAgent(
+                host="localhost",
+                port=5432,
+                database="fashion_recommendation",
+                user="postgres",
+                password="password"
+            )
+            
+            print("✅ PostgreSQL 시스템 초기화 완료")
+            
+        except Exception as e:
+            print(f"❌ PostgreSQL 시스템 초기화 실패: {e}")
+            self.use_postgresql = False
+
     def _load_and_process_data(self):
         """데이터 로드 및 전처리"""
         print("데이터 로드 중...")
@@ -187,6 +272,15 @@ class LLMFashionRecommendationSystem:
             result['intent'] = conv.get('intent')
             result['confidence'] = conv.get('confidence', 0.0)
             return result
+        
+        # PostgreSQL 시스템 사용 시
+        if self.use_postgresql and self.postgresql_agent:
+            return self._process_user_input_postgresql(user_input)
+        
+        # RDB 시스템 사용 시
+        if self.use_rdb and self.rdb_agent:
+            return self._process_user_input_rdb(user_input)
+        
         # 기존 순차 처리 시스템
         return self._process_user_input_sequential(user_input)
     
@@ -244,6 +338,118 @@ class LLMFashionRecommendationSystem:
         }
         
         return response
+
+    def _process_user_input_postgresql(self, user_input: str) -> Dict[str, Any]:
+        """PostgreSQL 기반 사용자 입력 처리"""
+        
+        # 1. 대화 에이전트로 의도 탐지 및 응답 생성
+        conversation_result = self.conversation_agent.process_user_input(user_input)
+        
+        # 2. 추천이 필요한 경우 PostgreSQL 기반 추천 수행
+        recommendations = []
+        if conversation_result['requires_recommendation']:
+            # 쿼리 정제
+            refined_query = self.query_refiner.refine_query(
+                user_input, 
+                context=conversation_result['context']
+            )
+            
+            # 추천 요청 구성
+            recommendation_request = {
+                'original_query': user_input,
+                'filters': refined_query['filters'],
+                'user_preferences': conversation_result['context'].get('user_preferences', {}),
+                'intent': conversation_result['intent'],
+                'user_id': 'anonymous'  # 실제로는 사용자 ID 사용
+            }
+            
+            # PostgreSQL 기반 상품 추천
+            if self.postgresql_agent:
+                recommendations = self.postgresql_agent.recommend_products(
+                    recommendation_request, 
+                    top_k=3
+                )
+        
+        # 3. 최종 응답 구성
+        response = {
+            'text': conversation_result['response'],
+            'intent': conversation_result['intent'],
+            'confidence': conversation_result['confidence'],
+            'recommendations': [
+                {
+                    'product_id': rec.product_id,
+                    'product_name': rec.product_name,
+                    'category': rec.category,
+                    'rating': safe_float(getattr(rec, 'rating', 0.0)),
+                    'review_count': safe_int(getattr(rec, 'review_count', 0)),
+                    'recommendation_reason': rec.recommendation_reason,
+                    'confidence_score': safe_float(getattr(rec, 'confidence_score', 0.0)),
+                    'url': getattr(rec, 'url', ''),
+                    'image_url': getattr(rec, 'image_url', ''),
+                    'representative_review': getattr(rec, 'representative_review', None)
+                }
+                for rec in recommendations
+            ],
+            'context': conversation_result['context']
+        }
+        
+        return response
+
+    def _process_user_input_rdb(self, user_input: str) -> Dict[str, Any]:
+        """RDB 기반 사용자 입력 처리"""
+        
+        # 1. 대화 에이전트로 의도 탐지 및 응답 생성
+        conversation_result = self.conversation_agent.process_user_input(user_input)
+        
+        # 2. 추천이 필요한 경우 RDB 기반 추천 수행
+        recommendations = []
+        if conversation_result['requires_recommendation']:
+            # 쿼리 정제
+            refined_query = self.query_refiner.refine_query(
+                user_input, 
+                context=conversation_result['context']
+            )
+            
+            # 추천 요청 구성
+            recommendation_request = {
+                'original_query': user_input,
+                'filters': refined_query['filters'],
+                'user_preferences': conversation_result['context'].get('user_preferences', {}),
+                'intent': conversation_result['intent'],
+                'user_id': 'anonymous'  # 실제로는 사용자 ID 사용
+            }
+            
+            # RDB 기반 상품 추천
+            if self.rdb_agent:
+                recommendations = self.rdb_agent.recommend_products(
+                    recommendation_request, 
+                    top_k=3
+                )
+        
+        # 3. 최종 응답 구성
+        response = {
+            'text': conversation_result['response'],
+            'intent': conversation_result['intent'],
+            'confidence': conversation_result['confidence'],
+            'recommendations': [
+                {
+                    'product_id': rec.product_id,
+                    'product_name': rec.product_name,
+                    'category': rec.category,
+                    'rating': safe_float(getattr(rec, 'rating', 0.0)),
+                    'review_count': safe_int(getattr(rec, 'review_count', 0)),
+                    'recommendation_reason': rec.recommendation_reason,
+                    'confidence_score': safe_float(getattr(rec, 'confidence_score', 0.0)),
+                    'url': getattr(rec, 'url', ''),
+                    'image_url': getattr(rec, 'image_url', ''),
+                    'representative_review': getattr(rec, 'representative_review', None)
+                }
+                for rec in recommendations
+            ],
+            'context': conversation_result['context']
+        }
+        
+        return response
     
     def get_conversation_summary(self) -> Dict[str, Any]:
         """대화 요약 정보 반환"""
@@ -272,7 +478,7 @@ class LLMFashionRecommendationSystem:
     def switch_to_langgraph(self):
         """LangGraph 시스템으로 전환"""
         if LANGGRAPH_AVAILABLE and self.products_df is not None:
-            self.langgraph_system = LangGraphFashionSystem(self.products_df, self.api_key)
+            self.langgraph_system = LangGraphFashionSystem(self.products_df, self.data_processor.api_key)
             self.use_langgraph = True
             print("LangGraph 기반 워크플로우 시스템으로 전환되었습니다.")
         else:
@@ -287,11 +493,23 @@ class LLMFashionRecommendationSystem:
 def main():
     """메인 추천 시스템 테스트"""
     
-    # LangGraph 시스템 사용 여부 선택
-    use_langgraph = input("LangGraph 기반 시스템을 사용하시겠습니까? (y/n): ").lower() == 'y'
+    # 기본값으로 순차 처리 시스템 사용 (무한 루프 방지)
+    use_langgraph = False
+    use_postgresql = False
+    use_rdb = False
+    
+    print("=== LLM 기반 패션 추천 시스템 테스트 (순차 처리) ===")
+    print("LangGraph: 비활성화 (무한 루프 방지)")
+    print("PostgreSQL: 비활성화")
+    print("RDB: 비활성화")
+    print("순차 처리 시스템 사용\n")
     
     # 시스템 초기화
-    system = LLMFashionRecommendationSystem(use_langgraph=use_langgraph)
+    system = LLMFashionRecommendationSystem(
+        use_langgraph=use_langgraph, 
+        use_rdb=use_rdb, 
+        use_postgresql=use_postgresql
+    )
     
     # 테스트 대화
     test_conversation = [
@@ -299,7 +517,16 @@ def main():
         "가격대가 낮은 걸로 보여줘"
     ]
     
-    system_type = "LangGraph" if system.use_langgraph else "순차 처리"
+    # 시스템 타입 결정
+    if system.use_langgraph:
+        system_type = "LangGraph"
+    elif system.use_postgresql:
+        system_type = "PostgreSQL"
+    elif system.use_rdb:
+        system_type = "RDB"
+    else:
+        system_type = "순차 처리"
+    
     print(f"=== LLM 기반 패션 추천 시스템 테스트 ({system_type}) ===\n")
     
     for user_input in test_conversation:

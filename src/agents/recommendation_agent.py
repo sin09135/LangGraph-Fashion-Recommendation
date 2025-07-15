@@ -51,10 +51,15 @@ def robust_style_keywords(product):
     try:
         # dict-like
         if isinstance(product, dict):
-            val = product.get('style_keywords', [])
+            val = product.get('style_keywords', product.get('tags', []))
         # pandas Series, numpy.void 등
-        elif hasattr(product, '__contains__') and 'style_keywords' in product:
-            val = product['style_keywords']
+        elif hasattr(product, '__contains__'):
+            if 'style_keywords' in product:
+                val = product['style_keywords']
+            elif 'tags' in product:
+                val = product['tags']
+            else:
+                val = []
         else:
             val = []
         if not isinstance(val, list):
@@ -106,27 +111,29 @@ class RecommendationAgent:
         self.recommendation_history: List[Dict[str, Any]] = []
         
         # 시스템 프롬프트
-        self.system_prompt = """당신은 패션 상품 추천 전문가입니다.
+        self.system_prompt = """
+        당신은 패션 상품 추천 전문가입니다.
 
-주요 역할:
-1. 사용자 요청에 맞는 상품 추천
-2. 추천 이유를 자연스럽고 설득력 있게 설명
-3. 사용자 취향과 선호도 반영
-4. 트렌드와 인기도 고려
+        주요 역할:
+        1. 사용자 요청에 맞는 상품 추천
+        2. 추천 이유를 자연스럽고 설득력 있게 설명
+        3. 사용자 취향과 선호도 반영
+        4. 트렌드와 인기도 고려
 
-추천 설명 스타일:
-- 친근하고 자연스러운 톤 사용
-- 구체적인 스타일 특징 언급
-- 평점과 리뷰 수 활용
-- 사용자 요청과의 연관성 강조
-- 이모티콘 적절히 활용
+        추천 설명 스타일:
+        - 친근하고 자연스러운 톤 사용
+        - 구체적인 스타일 특징 언급
+        - 평점과 리뷰 수 활용
+        - 사용자 요청과의 연관성 강조
+        - 이모티콘 적절히 활용
 
-예시:
-"이 반팔은 꾸안꾸 무드에 딱이고, 요즘 무신사 랭킹에도 올라와 있어요! 4.8점의 높은 평점과 2000개 이상의 리뷰를 받았답니다 😊" """
-    
+        예시:
+        "이 반팔은 꾸안꾸 무드에 딱이고, 요즘 무신사 랭킹에도 올라와 있어요! 4.8점의 높은 평점과 2000개 이상의 리뷰를 받았답니다 😊" """
+            
     def recommend_products(self, 
                           user_request: Dict[str, Any], 
                           top_k: int = 5) -> List[ProductRecommendation]:
+                          
         """상품 추천 수행 (상품 데이터 + 리뷰 데이터 하이브리드)"""
         filters = user_request.get('filters', {})
         user_preferences = user_request.get('user_preferences', {})
@@ -162,12 +169,13 @@ class RecommendationAgent:
         # 명확한 조건이 2개 이상이면 SQL 기반
         clear_conditions = sum([
             1 if filters.get('categories') else 0,
-            1 if filters.get('style_keywords') else 0,
+            1 if filters.get('tags') else 0,  # style_keywords -> tags로 수정
             1 if filters.get('color') else 0,
             1 if filters.get('brand') else 0,
             1 if filters.get('price_range') else 0
         ])
         
+        print(f"🔍 SQL 분기 조건 확인: {clear_conditions}개 조건 (필터: {filters})")
         return clear_conditions >= 2
     
     def _convert_image_url(self, image_path: str) -> str:

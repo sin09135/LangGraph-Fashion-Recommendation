@@ -19,6 +19,7 @@ class MusinsaDataProcessor:
         self.data_dir = Path(data_dir)
         self.products_df = None
         self.reviews_data = None
+        self.api_key = None  # API 키 속성 추가
         
     def load_data(self) -> Dict[str, pd.DataFrame]:
         """데이터 파일들을 로드"""
@@ -54,6 +55,46 @@ class MusinsaDataProcessor:
             print(f"전체 상품 데이터 로드: {len(data['products'])}개 상품")
             
         return data
+    
+    def load_reviews_data(self) -> Dict[str, List[Dict[str, Any]]]:
+        """리뷰 데이터 로드"""
+        reviews_data = {}
+        
+        try:
+            # merged_all_data.json에서 리뷰 데이터 로드
+            merged_all_path = self.data_dir / "merged_all_data.json"
+            if merged_all_path.exists():
+                with open(merged_all_path, 'r', encoding='utf-8') as f:
+                    products_data = json.load(f)
+                
+                for product in products_data:
+                    if 'review_info' in product and 'reviews' in product['review_info']:
+                        # URL에서 product_id 추출
+                        product_id = product['url'].split('/')[-1]
+                        reviews = product['review_info']['reviews']
+                        
+                        # 리뷰 데이터 정리
+                        formatted_reviews = []
+                        for review in reviews:
+                            if isinstance(review, dict) and 'content' in review:
+                                formatted_reviews.append({
+                                    "content": review['content'],
+                                    "rating": review.get('rating', 5),
+                                    "helpful_count": review.get('helpful_count', 0),
+                                    "date": review.get('date', '2024-01-01')
+                                })
+                        
+                        if formatted_reviews:
+                            reviews_data[product_id] = formatted_reviews
+                
+                print(f"리뷰 데이터 로드 완료: {len(reviews_data)}개 상품")
+            else:
+                print("리뷰 데이터 파일을 찾을 수 없습니다.")
+                
+        except Exception as e:
+            print(f"리뷰 데이터 로드 실패: {e}")
+        
+        return reviews_data
     
     def preprocess_products(self, df: pd.DataFrame) -> pd.DataFrame:
         """상품 데이터 전처리"""

@@ -1,0 +1,33 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	conversation_agent(conversation_agent)
+	recommendation_agent(recommendation_agent)
+	evaluator(evaluator)
+	recommendation_adjustment(recommendation_adjustment)
+	feedback_detection(feedback_detection)
+	feedback_processor(feedback_processor)
+	response_generator(response_generator)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> conversation_agent;
+	conversation_agent -. &nbsp;feedback&nbsp; .-> feedback_processor;
+	conversation_agent -. &nbsp;recommendation_needed&nbsp; .-> recommendation_agent;
+	conversation_agent -. &nbsp;general_chat&nbsp; .-> response_generator;
+	evaluator -. &nbsp;quality_good&nbsp; .-> feedback_detection;
+	evaluator -. &nbsp;needs_improvement&nbsp; .-> recommendation_adjustment;
+	feedback_detection -. &nbsp;behavior_feedback&nbsp; .-> feedback_processor;
+	feedback_detection -. &nbsp;more_items&nbsp; .-> recommendation_adjustment;
+	feedback_detection -. &nbsp;positive_feedback&nbsp; .-> response_generator;
+	feedback_processor -. &nbsp;re_recommend&nbsp; .-> recommendation_agent;
+	feedback_processor -. &nbsp;error&nbsp; .-> response_generator;
+	recommendation_adjustment --> recommendation_agent;
+	recommendation_agent -. &nbsp;success&nbsp; .-> evaluator;
+	recommendation_agent -. &nbsp;error&nbsp; .-> response_generator;
+	response_generator --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

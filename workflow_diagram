@@ -1,0 +1,27 @@
+// 패션 추천 시스템 LangGraph 워크플로우
+digraph {
+	rankdir=TB
+	node [fontname=Arial fontsize=12 shape=box style="rounded,filled"]
+	start [label="시작
+(사용자 입력)" fillcolor=lightblue]
+	conversation [label="대화 분석 노드
+(Conversation Agent)" fillcolor=lightgreen]
+	recommendation [label="추천 처리 노드
+(Recommendation Agent)" fillcolor=lightyellow]
+	feedback [label="피드백 처리 노드
+(Feedback Agent)" fillcolor=lightcoral]
+	response [label="응답 생성 노드
+(Response Agent)" fillcolor=lightpink]
+	end [label="종료
+(최종 응답)" fillcolor=lightgray]
+	start -> conversation [label="사용자 메시지"]
+	conversation -> recommendation [label="대화 분석 결과"]
+	recommendation -> feedback [label="추천 결과"]
+	feedback -> response [label="피드백 처리 결과"]
+	response -> end [label="최종 응답"]
+	condition [label="조건부 분기
+(추천 필요 여부)" fillcolor=lightcyan shape=diamond]
+	conversation -> condition [label="대화 분석"]
+	condition -> recommendation [label="추천 필요"]
+	condition -> response [label="추천 불필요"]
+}
